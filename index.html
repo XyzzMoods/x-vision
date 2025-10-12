@@ -1,0 +1,146 @@
+<!DOCTYPE html><html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>X-Vision (Ejen Ali Iris Mode)</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #000814;
+      overflow: hidden;
+      font-family: 'Orbitron', sans-serif;
+      color: cyan;
+    }
+    video, canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+    }
+    #hud {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      background: radial-gradient(rgba(0,255,255,0.05), transparent 70%);
+      mix-blend-mode: screen;
+    }
+    #mode-label {
+      position: fixed;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 22px;
+      letter-spacing: 2px;
+      color: cyan;
+      text-shadow: 0 0 10px cyan;
+    }
+    .controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 12px;
+      z-index: 999;
+    }
+    button {
+      background: rgba(0,255,255,0.1);
+      border: 1px solid cyan;
+      color: cyan;
+      font-weight: bold;
+      font-family: 'Orbitron', sans-serif;
+      padding: 10px 14px;
+      border-radius: 10px;
+      cursor: pointer;
+      text-shadow: 0 0 5px cyan;
+    }
+    button.active {
+      background: cyan;
+      color: #000814;
+      text-shadow: none;
+    }
+  </style>
+</head>
+<body>
+  <video id="cam" autoplay playsinline></video>
+  <canvas id="fx"></canvas>
+  <div id="hud"></div>
+  <div id="mode-label">MODE: NORMAL</div>
+  <div class="controls">
+    <button data-mode="normal" class="active">Normal</button>
+    <button data-mode="thermal">Thermal</button>
+    <button data-mode="night">Night</button>
+    <button data-mode="digital">Digital</button>
+  </div>  <script>
+    const video = document.getElementById('cam');
+    const canvas = document.getElementById('fx');
+    const ctx = canvas.getContext('2d');
+    const modeLabel = document.getElementById('mode-label');
+    const buttons = document.querySelectorAll('button');
+
+    let currentMode = 'normal';
+
+    async function initCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+        video.srcObject = stream;
+        draw();
+      } catch (err) {
+        alert('Gagal mengakses kamera: ' + err);
+      }
+    }
+
+    function draw() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      let frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      let data = frame.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        let r = data[i], g = data[i + 1], b = data[i + 2];
+
+        if (currentMode === 'thermal') {
+          let avg = (r + g + b) / 3;
+          data[i] = avg > 128 ? 255 : avg * 2;
+          data[i + 1] = avg / 2;
+          data[i + 2] = 255 - avg;
+        }
+        else if (currentMode === 'night') {
+          let avg = (r + g + b) / 3;
+          data[i] = avg * 0.2;
+          data[i + 1] = avg;
+          data[i + 2] = avg * 0.2;
+        }
+        else if (currentMode === 'digital') {
+          let gray = (r + g + b) / 3;
+          let edge = (gray % 32 < 16) ? 255 : 0;
+          data[i] = 0;
+          data[i + 1] = edge;
+          data[i + 2] = 255;
+        }
+      }
+
+      ctx.putImageData(frame, 0, 0);
+      requestAnimationFrame(draw);
+    }
+
+    buttons.forEach(btn => {
+      btn.onclick = () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        currentMode = btn.dataset.mode;
+        modeLabel.textContent = 'MODE: ' + currentMode.toUpperCase();
+      };
+    });
+
+    initCamera();
+  </script></body>
+</html>
